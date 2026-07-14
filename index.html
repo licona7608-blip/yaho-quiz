@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 야호 실시간 퀴즈 대결 (학생용)</title>
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --bg: #f3f4f6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        h1 { color: #1f2937; margin-bottom: 10px; font-size: 28px; }
+        p { color: #6b7280; margin-bottom: 30px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 14px;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            transition: border 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--primary-hover); }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* 로비 캐릭터 격자 */
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .player-card {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 16px;
+            font-weight: bold;
+        }
+        .player-avatar { font-size: 40px; margin-bottom: 5px; }
+
+        /* 게임플레이 버튼 */
+        .quiz-title { font-size: 22px; font-weight: bold; margin-bottom: 20px; color: #111827; }
+        .options-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+        .opt-btn {
+            background: #f3f4f6;
+            color: #1f2937;
+            border: 2px solid #e5e7eb;
+            text-align: left;
+            padding: 18px;
+            font-size: 16px;
+        }
+        .opt-btn:hover { background: #e5e7eb; }
+        .ox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .ox-btn { font-size: 60px; height: 150px; text-align: center; display: flex; align-items: center; justify-content: center; }
+        
+        /* 대기 안내 */
+        .submitted-msg { font-size: 20px; color: #059669; font-weight: bold; margin-top: 50px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="join-screen" class="screen active">
+        <h1>🎒 실시간 퀴즈 온!</h1>
+        <p>선생님 방에 참가하기 위해 이름을 적어주세요.</p>
+        <input type="text" id="nickname-input" placeholder="반 번호 + 이름 입력 (예: 3번 정광수)" />
+        <button onclick="joinQuiz()">대기실 입장하기 ➡️</button>
+    </div>
+
+    <div id="lobby-screen" class="screen">
+        <h1>👥 실시간 대기방</h1>
+        <p id="lobby-status">선생님이 게임을 시작하기를 기다리고 있어요...</p>
+        <div class="player-grid" id="player-list"></div>
+    </div>
+
+    <div id="play-screen" class="screen">
+        <div class="quiz-title" id="quiz-text">질문 준비 중...</div>
+        <div id="quiz-content"></div>
+    </div>
+
+    <div id="submitted-screen" class="screen">
+        <div class="submitted-msg">🟢 제출 완료!</div>
+        <p>다른 친구들이 다 풀 때까지 잠시만 기다려 주세요.</p>
+    </div>
+
+    <div id="leaderboard-screen" class="screen">
+        <h1>📊 현재 실시간 점수판</h1>
+        <p>친구들의 성적을 확인해 보세요!</p>
+        <div id="leaderboard-list"></div>
+    </div>
+</div>
+
+<script>
+    // =======================================================
+    // ⚙️ ✨ [여기에 파이소켓에서 복사한 키를 꼭 채워주세요] ✨
+    // =======================================================
+    const clusterId = "YOUR_CLUSTER_ID";  // 👈 대시보드에서 복사한 Cluster ID 입력
+    const apiKey = "YOUR_API_KEY";        // 👈 대시보드에서 복사한 API Key 입력
+    const channelId = "yaho-quiz-room";   // 가상 교실 고유 방 주소
+
+    let socket;
+    let myName = "";
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId + '-screen').classList.add('active');
+    }
+
+    function joinQuiz() {
+        const input = document.getElementById('nickname-input');
+        if (!input.value.trim()) {
+            alert("이름을 입력해 주세요!");
+            return;
+        }
+        myName = input.value.trim();
+        
+        // 웹소켓 클라우드 서버에 접속
+        const url = `wss://${clusterId}.piesocket.com/v3/${channelId}?api_key=${apiKey}&notify_self=0`;
+        socket = new WebSocket(url);
+
+        socket.onopen = () => {
+            // 접속 성공 시 선생님 기지국에 로그인 패킷 전송
+            socket.send(`JOIN|${myName}`);
+            showScreen('lobby');
+        };
+
+        socket.onmessage = (event) => {
+            const parts = event.data.split('|');
+            const header = parts[0];
+
+            if (header === "SYNC_LOBBY") {
+                showScreen('lobby');
+                if (parts.length > 7) updatePlayers(parts[7]);
+            } 
+            else if (header === "SYNC_PLAY") {
+                const round = parts[1];
+                const type = parts[2];
+                const text = parts[3];
+                const options = parts[4] ? parts[4].split(',') : [];
+                
+                showScreen('play');
+                renderQuestion(type, text, options);
+                if (parts.length > 7) updatePlayers(parts[7]);
+            } 
+            else if (header === "SYNC_LEADERBOARD" || header === "SYNC_FINAL") {
+                showScreen('leaderboard');
+                if (parts.length > 7) renderLeaderboard(parts[7]);
+            }
+        };
+
+        socket.onclose = () => {
+            alert("서버와의 연결이 끊어졌습니다. 다시 접속해 주세요.");
+            showScreen('join');
+        };
+    }
+
+    function sendAnswer(answer) {
+        socket.send(`SUBMIT|${myName}|${answer}`);
+        showScreen('submitted');
+    }
+
+    function renderQuestion(type, text, options) {
+        document.getElementById('quiz-text').innerText = text;
+        const container = document.getElementById('quiz-content');
+        container.innerHTML = "";
+
+        if (type === "OX") {
+            container.className = "ox-grid";
+            container.innerHTML = `
+                <button class="ox-btn" onclick="sendAnswer('0')">⭕</button>
+                <button class="ox-btn" onclick="sendAnswer('1')">❌</button>
+            `;
+        } else if (type === "4지선다") {
+            container.className = "options-grid";
+            options.forEach((opt, idx) => {
+                container.innerHTML += `
+                    <button class="opt-btn" onclick="sendAnswer('${idx}')">${idx+1}. ${opt}</button>
+                `;
+            });
+        } else if (type === "단답형") {
+            container.className = "";
+            container.innerHTML = `
+                <input type="text" id="short-answer" placeholder="정답을 입력하세요" style="margin-top:20px;"/>
+                <button onclick="sendAnswer(document.getElementById('short-answer').value)">정답 제출하기 ➡️</button>
+            `;
+        }
+    }
+
+    function updatePlayers(jsonStr) {
+        try {
+            const players = JSON.parse(jsonStr);
+            const container = document.getElementById('player-list');
+            container.innerHTML = "";
+            players.forEach(p => {
+                if(!p.isTeacher) {
+                    container.innerHTML += `
+                        <div class="player-card">
+                            <div class="player-avatar">${p.avatar}</div>
+                            <div>${p.name}</div>
+                        </div>
+                    `;
+                }
+            });
+        } catch (e) {}
+    }
+
+    function renderLeaderboard(jsonStr) {
+        try {
+            const players = JSON.parse(jsonStr).filter(p => !p.isTeacher);
+            const container = document.getElementById('leaderboard-list');
+            container.innerHTML = "";
+            players.forEach((p, idx) => {
+                container.innerHTML += `
+                    <div class="player-card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; text-align:left;">
+                        <span><strong>${idx+1}등</strong> ${p.avatar} ${p.name}</span>
+                        <span style="color:var(--primary); font-weight:bold;">${p.score}점</span>
+                    </div>
+                `;
+            });
+        } catch (e) {}
+    }
+</script>
+</body>
+</html>
