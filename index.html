@@ -14,11 +14,14 @@
         .screen { display: none; }
         .screen.active { display: block; }
         
+        /* 🚨 추가된 반 선택 드롭다운 디자인 */
+        .class-select { width: 100%; padding: 15px; border: 2px solid #e5e7eb; border-radius: 14px; font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 20px; background-color: white; cursor: pointer; text-align: center; }
+        .class-select:focus { border-color: var(--primary); outline: none; }
+
         /* 캐릭터 목록 그리드 */
         .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
         .avatar-btn { font-size: 40px; background: #f3f4f6; border: 3px solid #e5e7eb; border-radius: 18px; padding: 10px; cursor: pointer; transition: all 0.2s; }
         .avatar-btn:hover { background: #e0e7ff; border-color: var(--primary); transform: scale(1.05); }
-        .avatar-btn.taken { opacity: 0.2; pointer-events: none; background: #d1d5db; border-color: #9ca3af; }
         
         /* 대기실 디자인 */
         .lobby-box { background: #f9fafb; padding: 20px; border-radius: 18px; border: 2px solid #e5e7eb; margin-bottom: 20px; }
@@ -46,15 +49,24 @@
 <body>
 
 <div class="container">
-    <!-- 1단계: 캐릭터(아바타) 선택 화면 -->
     <div id="join-screen" class="screen active">
-        <h1>🐯 나만의 캐릭터 선택</h1>
-        <p>친구들이 선택하지 않은 귀여운 캐릭터를 골라주세요!</p>
+        <h1>✨ 나만의 캐릭터 선택</h1>
+        
+        <!-- 🚨 새로 추가된 반 선택 드롭다운 -->
+        <select id="class-select" class="class-select" onchange="changeClass()">
+            <option value="class1">1반 (귀여운 동물 숲) 🐶</option>
+            <option value="class2">2반 (쥬라기 공룡) 🦖</option>
+            <option value="class3">3반 (새콤달콤 과일) 🍎</option>
+            <option value="class4">4반 (맛있는 간식) 🍕</option>
+            <option value="class5">5반 (신비한 우주) 🚀</option>
+            <option value="class6">6반 (부릉부릉 탈것) 🚓</option>
+            <option value="class7">7반 (깊은 바닷속) 🐙</option>
+        </select>
+
+        <p>우리 반을 고르고 캐릭터를 선택해 주세요!</p>
         <div class="avatar-grid" id="avatar-selector"></div>
-        <p style="font-size: 12px; color: #9ca3af;">* 이미 누군가 고른 캐릭터는 투명하게 변해 고를 수 없습니다.</p>
     </div>
 
-    <!-- 2단계: 실시간 대기방 & 내 이름 바꾸기 -->
     <div id="lobby-screen" class="screen">
         <h1>👥 실시간 대기방</h1>
         <div class="lobby-box">
@@ -69,19 +81,16 @@
         <div class="player-grid" id="player-list"></div>
     </div>
 
-    <!-- 3단계: 실시간 퀴즈 화면 -->
     <div id="play-screen" class="screen">
         <div class="quiz-title" id="quiz-text">질문 준비 중...</div>
         <div id="quiz-content"></div>
     </div>
 
-    <!-- 4단계: 정답 제출 완료 대기 화면 -->
     <div id="submitted-screen" class="screen">
         <div class="submitted-msg">🟢 제출이 완료되었습니다!</div>
         <p>친구들이 다 풀거나 선생님이 넘겨줄 때까지 기다려 주세요.</p>
     </div>
 
-    <!-- 5단계: 실시간 점수판 및 시상대 -->
     <div id="leaderboard-screen" class="screen">
         <h1 id="leaderboard-title">📊 현재 실시간 점수판</h1>
         <p>친구들의 성적을 확인해 보세요!</p>
@@ -91,13 +100,24 @@
 
 <script>
     // =======================================================
-    // ⚙️ ✨ [파이소켓 키 입력 부분] ✨
+    // ⚙️ ✨ [여기에 파이소켓 키를 다시 채워주세요] ✨
     // =======================================================
-    const clusterId = "free.blr2";  // 👈 대시보드에서 복사한 Cluster ID 입력
-    const apiKey = "k0tjrwgSEV54W6TclItbi4rFVbcF3KhofYoQDuav";        // 👈 대시보드에서 복사한 API Key 입력
+    const clusterId = "YOUR_CLUSTER_ID";  // 👈 여기에 Cluster ID 입력
+    const apiKey = "YOUR_API_KEY";        // 👈 여기에 API Key 입력
     const channelId = "yaho-quiz-room";   
 
-    const allAvatars = ["🐯", "🦊", "🐰", "🐻", "🐼", "🐨", "🦁", "🐸", "🐵", "🐔", "🐧", "🦉"];
+    // 🚨 7개 반을 위한 84개의 테마별 캐릭터 사전(Dictionary) 생성
+    const classAvatars = {
+        "class1": ["🐶", "🐱", "🐰", "🐹", "🐥", "🐧", "🐬", "🦭", "🐼", "🐨", "🐷", "🦄"],
+        "class2": ["🦖", "🦕", "🐊", "🐢", "🦎", "🐍", "🐉", "🐲", "🌋", "☄️", "🦴", "🥚"],
+        "class3": ["🍎", "🍌", "🍉", "🍇", "🍓", "🍑", "🍒", "🍍", "🥝", "🍊", "🍋", "🍈"],
+        "class4": ["🍔", "🍟", "🍕", "🌭", "🍿", "🍩", "🍪", "🍫", "🍬", "🍭", "🍦", "🥞"],
+        "class5": ["🚀", "🛸", "🌍", "🌕", "⭐", "☀️", "🪐", "👨‍🚀", "👽", "🛰️", "🔭", "🌌"],
+        "class6": ["🚗", "🚕", "🚙", "🚌", "🚓", "🚑", "🚒", "🚜", "🛵", "🚲", "🚂", "🚁"],
+        "class7": ["🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🦈", "🐋", "🐚", "🫧"]
+    };
+
+    let currentClassId = "class1"; // 기본값 1반
     let takenAvatars = [];
     let socket;
     let myAvatar = "";
@@ -106,28 +126,31 @@
     let currentRoundLocal = -1;
     let hasSubmittedLocal = false;
 
-    // 페이지 열리자마자 백그라운드 클라우드 안테나 자동 수신 시작
-    window.onload = () => {
-        connectWebSocket();
-    };
+    window.onload = () => { connectWebSocket(); };
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId + '-screen').classList.add('active');
     }
 
+    // 🚨 반이 바뀔 때마다 캐릭터 목록을 다시 그려주는 기능
+    function changeClass() {
+        currentClassId = document.getElementById('class-select').value;
+        renderAvatarSelector();
+    }
+
     function connectWebSocket() {
         const url = `wss://${clusterId}.piesocket.com/v3/${channelId}?api_key=${apiKey}&notify_self=0`;
         socket = new WebSocket(url);
+        
+        socket.onopen = () => { socket.send("REQUEST_STATE"); };
 
         socket.onmessage = (event) => {
             const parts = event.data.split('|');
             const header = parts[0];
 
             if (header === "SYNC_LOBBY") {
-                if (parts.length > 7) {
-                    updatePlayersAndAvatars(parts[7]);
-                }
+                if (parts.length > 7) updatePlayersAndAvatars(parts[7]);
             } 
             else if (header === "SYNC_PLAY") {
                 const round = parseInt(parts[1]);
@@ -139,7 +162,6 @@
                     currentRoundLocal = round;
                     hasSubmittedLocal = false;
                 }
-
                 if (!hasSubmittedLocal) {
                     showScreen('play');
                     renderQuestion(type, text, options);
@@ -157,7 +179,6 @@
                 if (parts.length > 7) renderLeaderboard(parts[7]);
             }
             else if (header === "REQ_RENAME") {
-                // 🚨 선생님이 "이름 변경해라!" 하고 레이더를 날렸을 때 반응
                 const targetAvatar = parts[1];
                 if (myAvatar === targetAvatar) {
                     alert("🚨 선생님이 올바른 이름으로 변경을 요청하셨습니다! 바른 실명으로 변경해 주세요.");
@@ -168,23 +189,35 @@
                 }
             }
             else if (header === "RESET") {
-                // ⏰ 30초가 지나 게임이 폭파되면 전체 동시 리셋
                 alert("⏰ 게임이 종료되어 메인 화면으로 돌아갑니다.");
                 location.reload();
             }
+            else if (header === "REJECT") {
+                const rejectedAvatar = parts[1];
+                if (myAvatar === rejectedAvatar) {
+                    alert("앗! 0.1초 차이로 다른 친구가 먼저 가져갔어요! 다른 캐릭터를 골라주세요.");
+                    myAvatar = "";
+                    myName = "";
+                    showScreen('join');
+                    socket.send("REQUEST_STATE");
+                }
+            }
         };
 
-        // 첫 가동 시 아바타 격자 화면 그리기
         renderAvatarSelector();
     }
 
     function renderAvatarSelector() {
         const grid = document.getElementById('avatar-selector');
         grid.innerHTML = "";
-        allAvatars.forEach(av => {
-            const isTaken = takenAvatars.includes(av);
-            const btnClass = isTaken ? "avatar-btn taken" : "avatar-btn";
-            grid.innerHTML += `<button class="${btnClass}" onclick="selectAvatar('${av}')">${av}</button>`;
+        
+        // 🚨 현재 선택된 반의 캐릭터들만 렌더링
+        const avatarsToShow = classAvatars[currentClassId];
+        
+        avatarsToShow.forEach(av => {
+            if (!takenAvatars.includes(av)) {
+                grid.innerHTML += `<button class="avatar-btn" onclick="selectAvatar('${av}')">${av}</button>`;
+            }
         });
     }
 
@@ -192,11 +225,8 @@
         if (takenAvatars.includes(avatar)) return;
         myAvatar = avatar;
         myName = "익명의 " + avatar;
-        
-        // 1. 클라우드에 "나 이 캐릭터로 들어간다!" 신호 송출
         socket.send(`JOIN|${avatar}`);
         
-        // 2. 대기실 내 화면 준비
         document.getElementById('my-avatar-display').innerText = avatar;
         document.getElementById('nickname-input-lobby').value = "";
         showScreen('lobby');
@@ -206,9 +236,7 @@
         const input = document.getElementById('nickname-input-lobby');
         if (!input.value.trim()) { alert("바른 이름을 입력해 주세요!"); return; }
         myName = input.value.trim();
-        input.style.borderColor = "#e5e7eb"; // 원래 색상 복구
-        
-        // 선생님 패드에 이름 변경 패킷 송신
+        input.style.borderColor = "#e5e7eb";
         socket.send(`RENAME|${myAvatar}|${myName}`);
         alert("이름이 정상적으로 저장되었습니다!");
     }
@@ -216,7 +244,6 @@
     function sendAnswer(answer) {
         if (hasSubmittedLocal) return;
         hasSubmittedLocal = true;
-        // 아바타 기준으로 정답 제출 식별
         socket.send(`SUBMIT|${myAvatar}|${answer}`);
         showScreen('submitted');
     }
@@ -243,16 +270,12 @@
     function updatePlayersAndAvatars(jsonStr) {
         try {
             const players = JSON.parse(jsonStr);
-            
-            // 실시간으로 선점된 캐릭터 목록을 갱신
             takenAvatars = players.filter(p => !p.isTeacher).map(p => p.avatar);
             
-            // 만약 캐릭터 선택창에 머무는 상태라면 격자판 실시간 새로고침
             if (document.getElementById('join-screen').classList.contains('active')) {
                 renderAvatarSelector();
             }
 
-            // 대기실 리스트 화면 갱신
             const container = document.getElementById('player-list');
             container.innerHTML = "";
             players.forEach(p => {
